@@ -127,3 +127,172 @@ a = Person('Guido')
 print(a.first_name)
 a.first_name = 'qqq'
 
+# 8.7 调用父类方法
+# 为了调用父类(超类)的一个方法，可以使用 super() 函数，比如
+class A:
+    def spam(self):
+        print('A.spam')
+
+class B(A):
+    def spam(self):
+        print('B.spam')
+        super().spam()  # Call parent spam()
+# 8.8 子类中扩展property
+# 如果你仅仅只想扩展property的某一个方法，那么可以像下面这样写：
+class SubPerson(Person):
+    @Person.first_name.getter
+    def first_name(self):
+        print('Getting name')
+        return super().name
+# 或者，你只想修改setter方法，就这么写：
+class SubPerson(Person):
+    @Person.first_name.setter
+    def first_name(self, value):
+        print('Setting name to', value)
+        super(SubPerson, SubPerson).first_name.__set__(self, value)
+
+
+# 8.9 创建新的类或实例属性
+# 如果你想创建一个全新的实例属性，可以通过一个描述器类的形式来定义它的功能。下面是一个例子：
+# Descriptor attribute for an integer type-checked attribute
+class Integer:
+    def __init__(self, name):
+        self.name = name
+
+    def __get__(self, instance, cls):
+        if instance is None:
+            return self
+        else:
+            return instance.__dict__[self.name]
+
+    def __set__(self, instance, value):
+        if not isinstance(value, int):
+            raise TypeError('Expected an int')
+        instance.__dict__[self.name] = value
+
+    def __delete__(self, instance):
+        del instance.__dict__[self.name]
+
+# 一个描述器就是一个实现了三个核心的属性访问操作(get, set, delete)的类， 分别为 __get__()
+# __set__() 和 __delete__() 这三个特殊的方法。 这些方法接受一个实例作为输入，之后相应的操作实例底层的字典。
+# 为了使用一个描述器，需将这个描述器的实例作为类属性放到一个类的定义中。例如：
+class Point:
+    x = Integer('x')
+    y = Integer('y')
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+# 当你这样做后，所有对描述器属性(比如x或y)的访问会被 __get__() 、__set__() 和 __delete__() 方法捕获到。例如：
+p = Point(2, 3)
+print(p.x)
+# p.x = 2.3 # TypeError: Expected an int
+
+# 8.10 使用延迟计算属性
+# 你想将一个只读属性定义成一个property，并且只在访问的时候才会计算结果。
+# 但是一旦被访问后，你希望结果值被缓存起来，不用每次都去计算。
+# 定义一个延迟属性的一种高效方法是通过使用一个描述器类，如下所示：
+class lazyproperty:
+    def __init__(self, func):
+        self.func = func
+
+    def __get__(self, instance, cls):
+        if instance is None:
+            return self
+        else:
+            value = self.func(instance)
+            setattr(instance, self.func.__name__, value)
+            return value
+# 你需要像下面这样在一个类中使用它：
+import math
+
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    @lazyproperty
+    def area(self):
+        print('Computing area')
+        return math.pi * self.radius ** 2
+
+    @lazyproperty
+    def perimeter(self):
+        print('Computing perimeter')
+        return 2 * math.pi * self.radius
+# 下面在一个交互环境中演示它的使用：
+c = Circle(4.0)
+print(c.radius)
+print(c.area)
+print(c.area)
+print(c.perimeter)
+print(c.perimeter)
+
+# 仔细观察你会发现消息 Computing area 和 Computing perimeter 仅仅出现一次
+# 这种方案有一个小缺陷就是计算出的值被创建后是可以被修改的。例如：
+c.area = 25
+print(c.area)
+
+# 8.11 简化数据结构的初始化
+# 你写了很多仅仅用作数据结构的类，不想写太多烦人的 __init__() 函数
+# 可以在一个基类中写一个公用的 __init__() 函数：
+import math
+
+class Structure1:
+    # Class variable that specifies expected fields
+    _fields = []
+
+    def __init__(self, *args):
+        if len(args) != len(self._fields):
+            raise TypeError('Expected {} arguments'.format(len(self._fields)))
+        # Set the arguments
+        for name, value in zip(self._fields, args):
+            setattr(self, name, value)
+
+# Example class definitions
+class Stock(Structure1):
+    _fields = ['name', 'shares', 'price']
+
+class Point(Structure1):
+    _fields = ['x', 'y']
+
+class Circle(Structure1):
+    _fields = ['radius']
+
+    def area(self):
+        return math.pi * self.radius ** 2
+# 8.12 定义接口或者抽象基类
+# 使用 abc 模块可以很轻松的定义抽象基类：
+from abc import ABCMeta, abstractmethod
+
+class IStream(metaclass=ABCMeta):
+    @abstractmethod
+    def read(self, maxbytes=-1):
+        pass
+
+    @abstractmethod
+    def write(self, data):
+        pass
+class SocketStream(IStream):
+    def read(self, maxbytes=-1):
+        print('read')
+        pass
+
+    def write(self, data):
+        pass
+
+socket = SocketStream()
+socket.read()
+
+# 8.13 实现数据模型的类型约束
+# 8.14 实现自定义容器
+# 8.15 属性的代理访问
+# 8.16 在类中定义多个构造器
+# 8.17 创建不调用init方法的实例
+# 8.18 利用Mixins扩展类功能
+# 8.19 实现状态对象或者状态机
+# 8.20 通过字符串调用对象方法
+# 8.21 实现访问者模式
+# 8.22 不用递归实现访问者模式
+# 8.23 循环引用数据结构的内存管理
+# 8.24 让类支持比较操作
+# 8.25 创建缓存实例
